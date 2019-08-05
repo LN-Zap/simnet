@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import base64
+import binascii
 import click
 import json
 import os
@@ -52,7 +53,7 @@ def lndconnect_node(node):
     with open(f'{node.path}/data/chain/bitcoin/simnet/admin.macaroon', 'rb') as macaroon_file:
         macaroon = base64.urlsafe_b64encode(macaroon_file.read())
 
-        click.echo(click.style(f'lndconnect://127.0.0.1:{node.rpc_port}?cert={cert.decode()}&macaroon={macaroon.decode()}', fg='green'))
+    click.echo(click.style(f'lndconnect://127.0.0.1:{node.rpc_port}?cert={cert.decode()}&macaroon={macaroon.decode()}', fg='green'))
 
 @click.command()
 def lndconnect():
@@ -101,10 +102,33 @@ def stop():
     stop_node(alice)
     stop_node(bob)
 
+def address(node):
+    with open(f'{node.path}/data/chain/bitcoin/simnet/admin.macaroon', 'rb') as macaroon_file:
+        macaroon = binascii.hexlify(macaroon_file.read())
+
+    cert_path = f'{node.path}/tls.cert'
+    url = f'https://localhost:{node.rest_port}/v1/newaddress'
+    r = requests.get(
+        url, 
+        verify=cert_path,
+        headers={
+            'Grpc-Metadata-macaroon': macaroon
+        }
+    )
+    return r.json()['address']
+
+@click.command()
+@click.argument('count', default=1)
+def gen_block(count):
+    click.echo(count)
+    dest = address(alice)
+    click.echo(dest)
+
 cli.add_command(start)
 cli.add_command(stop)
 cli.add_command(init)
 cli.add_command(lndconnect)
+cli.add_command(gen_block)
 
 if __name__ == '__main__':
     cli()
