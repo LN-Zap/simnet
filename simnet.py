@@ -33,6 +33,7 @@ nodes = [alice, bob]
 def start_lnd(node):
     lnd = f'''
     lnd \
+    --alias={node.path} \
     --lnddir={node.path} \
     --rpclisten=localhost:{node.rpc_port} \
     --listen=localhost:{node.port} \
@@ -109,6 +110,7 @@ def start():
         start_node(node)
 
     time.sleep(2)
+    set_mining_node_index(0)
     lndconnect_node(nodes[0])
 
 @click.command()
@@ -131,22 +133,30 @@ def lncli(cmd, node):
 def lndconnect(node):
     lndconnect_node(nodes[node])
 
-@click.command()
-@click.argument('count', default=1)
-@click.option('--node', '-n', default=0)
-def gen_block(count, node):
-    dest = address(nodes[node])
-    click.echo(dest)
+def set_mining_node_index(index):
+    dest = address(nodes[index])
 
     os.system('killall btcd')
     time.sleep(2)
     os.system(f'btcd --simnet --txindex --rpcuser=kek --rpcpass=kek --miningaddr={dest} > /dev/null &')
-    time.sleep(2)
-    os.system(f'btcctl --simnet --rpcuser=kek --rpcpass=kek generate {count}')
-    time.sleep(1)
 
-    balance_json = post(node, 'balance/blockchain')
-    click.echo(click.style(str(balance_json), fg='green'))
+@click.command()
+@click.argument('node_index', type=int)
+def set_mining_node(node_index):
+    set_mining_node_index(node_index)
+
+@click.command()
+@click.argument('count', default=1)
+def gen_block(count):
+    os.system(f'btcctl --simnet --rpcuser=kek --rpcpass=kek generate {count} &> /dev/null')
+
+@click.command()
+@click.option('--node', '-n', default=0)
+def peer(node):
+    n = nodes[node]
+    pub_key = post(n, 'getinfo')['identity_pubkey']
+    address = f'{pub_key}@localhost:{n.port}'
+    click.echo(click.style(address, fg='green'))
 
 @click.group()
 def cli():
@@ -157,6 +167,8 @@ cli.add_command(stop)
 cli.add_command(lndconnect)
 cli.add_command(gen_block)
 cli.add_command(lncli)
+cli.add_command(peer)
+cli.add_command(set_mining_node)
 
 if __name__ == '__main__':
     cli()
