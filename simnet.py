@@ -71,10 +71,10 @@ def init_lnd(node):
         'cipher_seed_mnemonic': seed(node),
     }
     r = requests.post(url, verify=node.cert(), data=json.dumps(data))
-    click.echo(f'unlocked lnd at {node.path}')
+    click.echo(f'[{node.path}] wallet created')
 
 def start_node(node):
-    click.echo(f'starting lnd at {node.path}')
+    click.echo(f'[{node.path}] started')
     start_lnd(node)
     time.sleep(2)
     init_lnd(node)

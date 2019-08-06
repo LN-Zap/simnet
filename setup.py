@@ -6,6 +6,11 @@ setup(
     py_modules=['simnet'],
     install_requires=[
         'Click',
+        'pem',
+        'requests',
+        'twisted',
+        'pyOpenSSL',
+        'service_identity'
     ],
     entry_points='''
         [console_scripts]
