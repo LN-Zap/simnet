@@ -36,5 +36,5 @@ _SIMNET_COMPLETE=source_zsh simnet > simnet_complete.sh
 
 And then you put this into your .bashrc or .zshrc:
 ```
-. /path/to/foo-bar-complete.sh
+. /path/to/simnet_complete.sh
 ```
