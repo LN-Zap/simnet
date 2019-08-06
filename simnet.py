@@ -25,10 +25,10 @@ class Node:
     def cert(self):
         return f'{self.path}/tls.cert'
 
-alice = Node('alice', 10001, 8001, 10011)
-bob = Node('bob', 10002, 8002, 10012)
-
-nodes = [alice, bob]
+nodes = [
+    Node('alice', 10001, 8001, 10011),
+    Node('bob', 10002, 8002, 10012)
+]
 
 def start_lnd(node):
     lnd = f'''
@@ -100,6 +100,13 @@ def address(node):
     json = post(node, 'newaddress')
     return json['address']
 
+def set_mining_node_index(index):
+    dest = address(nodes[index])
+
+    os.system('killall btcd')
+    time.sleep(2)
+    os.system(f'btcd --simnet --txindex --rpcuser=kek --rpcpass=kek --miningaddr={dest} > /dev/null &')
+
 @click.command()
 def start():
     click.echo('starting btcd')
@@ -123,22 +130,15 @@ def stop():
 
 @click.command()
 @click.argument('cmd')
-@click.option('--node', '-n', default=0)
-def lncli(cmd, node):
-    selected_node = nodes[node]
-    os.system(f'lncli --tlscertpath={selected_node.cert()} --rpcserver=localhost:{selected_node.rpc_port} --macaroonpath={selected_node.macaroon()} {cmd}')
+@click.option('--node', '-n', 'node_index', default=0)
+def lncli(cmd, node_index):
+    node = nodes[node_index]
+    os.system(f'lncli --tlscertpath={node.cert()} --rpcserver=localhost:{node.rpc_port} --macaroonpath={node.macaroon()} {cmd}')
 
 @click.command()
-@click.option('--node', '-n', default=0)
-def lndconnect(node):
-    lndconnect_node(nodes[node])
-
-def set_mining_node_index(index):
-    dest = address(nodes[index])
-
-    os.system('killall btcd')
-    time.sleep(2)
-    os.system(f'btcd --simnet --txindex --rpcuser=kek --rpcpass=kek --miningaddr={dest} > /dev/null &')
+@click.option('--node', '-n', 'node_index', default=0)
+def lndconnect(node_index):
+    lndconnect_node(nodes[node_index])
 
 @click.command()
 @click.argument('node_index', type=int)
@@ -151,11 +151,11 @@ def gen_block(count):
     os.system(f'btcctl --simnet --rpcuser=kek --rpcpass=kek generate {count} &> /dev/null')
 
 @click.command()
-@click.option('--node', '-n', default=0)
-def peer(node):
-    n = nodes[node]
-    pub_key = post(n, 'getinfo')['identity_pubkey']
-    address = f'{pub_key}@localhost:{n.port}'
+@click.option('--node', '-n', 'node_index', default=0)
+def peer(node_index):
+    node = nodes[node_index]
+    pub_key = post(node, 'getinfo')['identity_pubkey']
+    address = f'{pub_key}@localhost:{node.port}'
     click.echo(click.style(address, fg='green'))
 
 @click.group()
