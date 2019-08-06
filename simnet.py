@@ -13,19 +13,22 @@ import time
 from twisted.internet import ssl
 
 class Node:
-    def __init__(self, path, rpc_port, rest_port, port, seed):
+    def __init__(self, path, rpc_port, rest_port, port):
         self.path = path
         self.rpc_port = rpc_port
         self.rest_port = rest_port
         self.port = port
-        self.seed = seed
 
-alice = Node('alice', 10001, 8001, 10011, ['absent', 'describe', 'disagree', 'device', 'globe', 'pipe', 'monkey', 'bracket', 'bid', 'thumb', 'ice', 'lawn', 'mango', 'stairs', 'pipe', 'abuse', 'jar', 'buffalo', 'mixture', 'arrange', 'clay', 'this', 'cactus', 'slice'])
-bob = Node('bob', 10002, 8002, 10012, ['absorb', 'filter', 'arrow', 'seminar', 'rebuild', 'abuse', 'topple', 'tape', 'museum', 'wrestle', 'circle', 'view', 'spell', 'slide','giraffe', 'switch', 'chimney', 'super', 'marble', 'omit', 'leopard', 'parent', 'recycle', 'either'])
+    def macaroon(self):
+        return f'{self.path}/data/chain/bitcoin/simnet/admin.macaroon'
 
-@click.group()
-def cli():
-    pass
+    def cert(self):
+        return f'{self.path}/tls.cert'
+
+alice = Node('alice', 10001, 8001, 10011)
+bob = Node('bob', 10002, 8002, 10012)
+
+nodes = [alice, bob]
 
 def start_lnd(node):
     lnd = f'''
@@ -46,32 +49,28 @@ def start_lnd(node):
     os.system(lnd) 
 
 def lndconnect_node(node):
-    chain = pem.parse_file(f'{node.path}/tls.cert')
+    chain = pem.parse_file(node.cert())
     chainCert = ssl.Certificate.loadPEM(str(chain[0]))
     cert = base64.b64encode(chainCert.dump())
 
-    with open(f'{node.path}/data/chain/bitcoin/simnet/admin.macaroon', 'rb') as macaroon_file:
+    with open(node.macaroon(), 'rb') as macaroon_file:
         macaroon = base64.urlsafe_b64encode(macaroon_file.read())
 
     click.echo(click.style(f'lndconnect://127.0.0.1:{node.rpc_port}?cert={cert.decode()}&macaroon={macaroon.decode()}', fg='green'))
 
-@click.command()
-def lndconnect():
-    lndconnect_node(alice)
+def seed(node):
+    url = f'https://localhost:{node.rest_port}/v1/genseed'
+    r = requests.get(url, verify=node.cert())
+    return r.json()['cipher_seed_mnemonic']
 
 def init_lnd(node):
-    cert_path = f'{node.path}/tls.cert'
     url = f'https://localhost:{node.rest_port}/v1/initwallet'
     data = {
         'wallet_password': base64.b64encode(b'12341234').decode(),
-        'cipher_seed_mnemonic': node.seed,
+        'cipher_seed_mnemonic': seed(node),
     }
-    r = requests.post(url, verify=cert_path, data=json.dumps(data))
+    r = requests.post(url, verify=node.cert(), data=json.dumps(data))
     click.echo(f'unlocked lnd at {node.path}')
-
-@click.command()
-def init():
-    init_lnd(alice)
 
 def start_node(node):
     click.echo(f'starting lnd at {node.path}')
@@ -79,56 +78,85 @@ def start_node(node):
     time.sleep(2)
     init_lnd(node)
     
+def stop_node(node):
+    shutil.rmtree(node.path, ignore_errors=True)
+
+def post(node, url):
+    with open(node.macaroon(), 'rb') as macaroon_file:
+        macaroon = binascii.hexlify(macaroon_file.read())
+
+    url = f'https://localhost:{node.rest_port}/v1/{url}'
+    r = requests.get(
+        url, 
+        verify=node.cert(),
+        headers={
+            'Grpc-Metadata-macaroon': macaroon
+        }
+    )
+    return r.json()
+
+def address(node):
+    json = post(node, 'newaddress')
+    return json['address']
+
 @click.command()
 def start():
     click.echo('starting btcd')
     btcd = 'btcd --txindex --simnet --rpcuser=kek --rpcpass=kek > /dev/null &'
     os.system(btcd)
     
-    start_node(alice)
-    start_node(bob)
+    for node in nodes:
+        start_node(node)
 
     time.sleep(2)
-    lndconnect_node(alice)
-
-def stop_node(node):
-    shutil.rmtree(node.path, ignore_errors=True)
+    lndconnect_node(nodes[0])
 
 @click.command()
 def stop():
     os.system('killall lnd')
     os.system('killall btcd')
     
-    stop_node(alice)
-    stop_node(bob)
+    for node in nodes:
+        stop_node(node)
 
-def address(node):
-    with open(f'{node.path}/data/chain/bitcoin/simnet/admin.macaroon', 'rb') as macaroon_file:
-        macaroon = binascii.hexlify(macaroon_file.read())
+@click.command()
+@click.argument('cmd')
+@click.option('--node', '-n', default=0)
+def lncli(cmd, node):
+    selected_node = nodes[node]
+    os.system(f'lncli --tlscertpath={selected_node.cert()} --rpcserver=localhost:{selected_node.rpc_port} --macaroonpath={selected_node.macaroon()} {cmd}')
 
-    cert_path = f'{node.path}/tls.cert'
-    url = f'https://localhost:{node.rest_port}/v1/newaddress'
-    r = requests.get(
-        url, 
-        verify=cert_path,
-        headers={
-            'Grpc-Metadata-macaroon': macaroon
-        }
-    )
-    return r.json()['address']
+@click.command()
+@click.option('--node', '-n', default=0)
+def lndconnect(node):
+    lndconnect_node(nodes[node])
 
 @click.command()
 @click.argument('count', default=1)
-def gen_block(count):
-    click.echo(count)
-    dest = address(alice)
+@click.option('--node', '-n', default=0)
+def gen_block(count, node):
+    dest = address(nodes[node])
     click.echo(dest)
+
+    os.system('killall btcd')
+    time.sleep(2)
+    os.system(f'btcd --simnet --txindex --rpcuser=kek --rpcpass=kek --miningaddr={dest} > /dev/null &')
+    time.sleep(2)
+    os.system(f'btcctl --simnet --rpcuser=kek --rpcpass=kek generate {count}')
+    time.sleep(1)
+
+    balance_json = post(node, 'balance/blockchain')
+    click.echo(click.style(str(balance_json), fg='green'))
+
+@click.group()
+def cli():
+    pass
 
 cli.add_command(start)
 cli.add_command(stop)
-cli.add_command(init)
 cli.add_command(lndconnect)
 cli.add_command(gen_block)
+cli.add_command(lncli)
 
 if __name__ == '__main__':
     cli()
