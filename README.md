@@ -1,7 +1,7 @@
 # Installation
 
 ```
-pip install https://github.com/LN-Zap/simnet/archive/master.zip
+pip3 install https://github.com/LN-Zap/simnet/archive/master.zip
 ```
 
 # Help
