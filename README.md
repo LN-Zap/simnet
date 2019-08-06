@@ -26,7 +26,7 @@ start
 stop
 ```
 
-## Autocomplete
+## Setup bash completion
 
 **bash**:
 ```
