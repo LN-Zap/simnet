@@ -1,10 +1,14 @@
-# Installation
+# simnet
+
+Watch the [demo](https://twitter.com/ottosuess/status/1158760429193220096).
+
+## Installation
 
 ```
 pip3 install https://github.com/LN-Zap/simnet/archive/master.zip
 ```
 
-# Help
+## Help
 
 ```
 Usage: simnet [OPTIONS] COMMAND [ARGS]...
@@ -22,7 +26,7 @@ start
 stop
 ```
 
-# Autocomplete
+## Setup bash completion
 
 **bash**:
 ```
