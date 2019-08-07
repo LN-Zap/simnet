@@ -25,10 +25,9 @@ class Node:
     def cert(self):
         return f'{self.path}/tls.cert'
 
-nodes = [
-    Node('alice', 10001, 8001, 10011),
-    Node('bob', 10002, 8002, 10012)
-]
+    @classmethod
+    def from_index(cls, node_index):
+        return Node(f'node_{node_index}', 10000 + node_index, 8000 + node_index, 11000 + node_index)
 
 def start_lnd(node):
     lnd = f'''
@@ -79,9 +78,6 @@ def start_node(node):
     time.sleep(2)
     init_lnd(node)
     
-def stop_node(node):
-    shutil.rmtree(node.path, ignore_errors=True)
-
 def post(node, url):
     with open(node.macaroon(), 'rb') as macaroon_file:
         macaroon = binascii.hexlify(macaroon_file.read())
@@ -101,44 +97,52 @@ def address(node):
     return json['address']
 
 def set_mining_node_index(index):
-    dest = address(nodes[index])
+    dest = address(Node.from_index(index))
 
     os.system('killall btcd')
     time.sleep(2)
     os.system(f'btcd --simnet --txindex --rpcuser=kek --rpcpass=kek --miningaddr={dest} > /dev/null &')
 
 @click.command()
-def start():
+@click.option('--count', '-c',  default=2)
+def start(count):
     click.echo('starting btcd')
     btcd = 'btcd --txindex --simnet --rpcuser=kek --rpcpass=kek > /dev/null &'
     os.system(btcd)
     
-    for node in nodes:
-        start_node(node)
+    for index in range(0, count):
+        start_node(Node.from_index(index))
 
     time.sleep(2)
     set_mining_node_index(0)
-    lndconnect_node(nodes[0])
+    lndconnect_node(Node.from_index(0))
 
 @click.command()
 def stop():
     os.system('killall lnd')
     os.system('killall btcd')
     
-    for node in nodes:
-        stop_node(node)
+    index = 0
+    while True:
+        node = Node.from_index(index)
+        try:
+            shutil.rmtree(node.path)
+        except:
+            click.echo(f'removed {index} nodes.')
+            break
+        index += 1
 
 @click.command()
 @click.argument('cmd')
 @click.option('--node', '-n', 'node_index', default=0)
 def lncli(cmd, node_index):
-    node = nodes[node_index]
+    node = Node.from_index(node_index)
     os.system(f'lncli --tlscertpath={node.cert()} --rpcserver=localhost:{node.rpc_port} --macaroonpath={node.macaroon()} {cmd}')
 
 @click.command()
 @click.option('--node', '-n', 'node_index', default=0)
 def lndconnect(node_index):
-    lndconnect_node(nodes[node_index])
+    lndconnect_node(Node.from_index(node_index))
 
 @click.command()
 @click.argument('node_index', type=int)
@@ -153,7 +157,7 @@ def gen_block(count):
 @click.command()
 @click.option('--node', '-n', 'node_index', default=0)
 def peer(node_index):
-    node = nodes[node_index]
+    node = Node.from_index(node_index)
     pub_key = post(node, 'getinfo')['identity_pubkey']
     address = f'{pub_key}@localhost:{node.port}'
     click.echo(click.style(address, fg='green'))

@@ -1,6 +1,5 @@
 *.swp
-alice/
-bob/
+node_*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
