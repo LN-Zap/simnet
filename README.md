@@ -8,6 +8,11 @@ Watch the [demo](https://twitter.com/ottosuess/status/1158760429193220096).
 pip3 install https://github.com/LN-Zap/simnet/archive/master.zip
 ```
 
+Or clone and run:
+```
+sudo -H pip3 install .
+```
+
 ## Help
 
 ```
