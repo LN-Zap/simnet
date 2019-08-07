@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name='simnet',
     python_requires='>3.5.2',
-    version='0.1',
+    version='0.2',
     py_modules=['simnet'],
     install_requires=[
         'Click',

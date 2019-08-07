@@ -32,6 +32,7 @@ class Node:
 def start_lnd(node):
     lnd = f'''
     lnd \
+    --maxpendingchannels=100 \
     --alias={node.path} \
     --lnddir={node.path} \
     --rpclisten=localhost:{node.rpc_port} \
@@ -69,16 +70,29 @@ def init_lnd(node):
         'wallet_password': base64.b64encode(b'12341234').decode(),
         'cipher_seed_mnemonic': seed(node),
     }
-    r = requests.post(url, verify=node.cert(), data=json.dumps(data))
+    r = requests.post(
+        url, 
+        verify=node.cert(), 
+        data=json.dumps(data)
+    )
     click.echo(f'[{node.path}] wallet created')
 
-def start_node(node):
-    click.echo(f'[{node.path}] started')
-    start_lnd(node)
-    time.sleep(2)
-    init_lnd(node)
-    
-def post(node, url):
+def post(node, url, data={}):
+    with open(node.macaroon(), 'rb') as macaroon_file:
+        macaroon = binascii.hexlify(macaroon_file.read())
+
+    url = f'https://localhost:{node.rest_port}/v1/{url}'
+    r = requests.post(
+        url, 
+        verify=node.cert(),
+        headers={
+            'Grpc-Metadata-macaroon': macaroon
+        },
+        data=json.dumps(data)
+    )
+    return r.json()
+
+def get(node, url, data={}):
     with open(node.macaroon(), 'rb') as macaroon_file:
         macaroon = binascii.hexlify(macaroon_file.read())
 
@@ -88,12 +102,13 @@ def post(node, url):
         verify=node.cert(),
         headers={
             'Grpc-Metadata-macaroon': macaroon
-        }
+        },
+        data=json.dumps(data)
     )
     return r.json()
 
 def address(node):
-    json = post(node, 'newaddress')
+    json = get(node, 'newaddress')
     return json['address']
 
 def set_mining_node_index(index):
@@ -103,23 +118,30 @@ def set_mining_node_index(index):
     time.sleep(2)
     os.system(f'btcd --simnet --txindex --rpcuser=kek --rpcpass=kek --miningaddr={dest} > /dev/null &')
 
+def run_lncli(node, cmd):
+    os.system(f'lncli --tlscertpath={node.cert()} --rpcserver=localhost:{node.rpc_port} --macaroonpath={node.macaroon()} {cmd}')
+
 @click.command()
 @click.option('--count', '-c',  default=2)
-def start(count):
+def init(count):
     """Start and initialize COUNT nodes"""
     click.echo('starting btcd')
     btcd = 'btcd --txindex --simnet --rpcuser=kek --rpcpass=kek > /dev/null &'
     os.system(btcd)
     
     for index in range(0, count):
-        start_node(Node.from_index(index))
+        node = Node.from_index(index)
+        click.echo(f'[{node.path}] started')
+        start_lnd(node)
+        time.sleep(2)
+        init_lnd(node)
 
     time.sleep(2)
     set_mining_node_index(0)
     lndconnect_node(Node.from_index(0))
 
 @click.command()
-def stop():
+def clean():
     """Stop btcd, lnd and remove all node data"""
     os.system('killall lnd')
     os.system('killall btcd')
@@ -140,7 +162,7 @@ def stop():
 def lncli(cmd, node_index):
     """Run lncli commands for a node"""
     node = Node.from_index(node_index)
-    os.system(f'lncli --tlscertpath={node.cert()} --rpcserver=localhost:{node.rpc_port} --macaroonpath={node.macaroon()} {cmd}')
+    run_lncli(node, cmd)
 
 @click.command()
 @click.argument('node_index', default=0)
@@ -165,21 +187,42 @@ def gen_block(count):
 def peer(node_index):
     """Show the address (identity_pubkey@host) of a node."""
     node = Node.from_index(node_index)
-    pub_key = post(node, 'getinfo')['identity_pubkey']
+    pub_key = get(node, 'getinfo')['identity_pubkey']
     address = f'{pub_key}@localhost:{node.port}'
     click.echo(click.style(address, fg='green'))
+
+@click.command()
+@click.argument('node_index', type=int)
+def start(node_index):
+    """Start a specific node"""
+    node = Node.from_index(node_index)
+    start_lnd(node)
+    time.sleep(2)
+    data = {
+        'wallet_password': base64.b64encode(b'12341234').decode()
+    }
+    post(node, 'unlockwallet', data)
+
+@click.command()
+@click.argument('node_index', type=int)
+def stop(node_index):
+    """Stop a specific node"""
+    node = Node.from_index(node_index)
+    run_lncli(node, 'stop')
 
 @click.group()
 def cli():
     """Simplify lnd simnets."""
 
-cli.add_command(start)
-cli.add_command(stop)
+cli.add_command(init)
+cli.add_command(clean)
 cli.add_command(lndconnect)
 cli.add_command(gen_block)
 cli.add_command(lncli)
 cli.add_command(peer)
 cli.add_command(set_mining_node)
+cli.add_command(start)
+cli.add_command(stop)
 
 if __name__ == '__main__':
     cli()
