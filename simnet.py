@@ -143,7 +143,7 @@ def lncli(cmd, node_index):
     os.system(f'lncli --tlscertpath={node.cert()} --rpcserver=localhost:{node.rpc_port} --macaroonpath={node.macaroon()} {cmd}')
 
 @click.command()
-@click.option('--node', '-n', 'node_index', default=0)
+@click.argument('node_index', default=0)
 def lndconnect(node_index):
     """Display the lndconnect url for a node"""
     lndconnect_node(Node.from_index(node_index))
