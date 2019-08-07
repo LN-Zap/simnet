@@ -106,6 +106,7 @@ def set_mining_node_index(index):
 @click.command()
 @click.option('--count', '-c',  default=2)
 def start(count):
+    """Start and initialize COUNT nodes"""
     click.echo('starting btcd')
     btcd = 'btcd --txindex --simnet --rpcuser=kek --rpcpass=kek > /dev/null &'
     os.system(btcd)
@@ -119,6 +120,7 @@ def start(count):
 
 @click.command()
 def stop():
+    """Stop btcd, lnd and remove all node data"""
     os.system('killall lnd')
     os.system('killall btcd')
     
@@ -136,27 +138,32 @@ def stop():
 @click.argument('cmd')
 @click.option('--node', '-n', 'node_index', default=0)
 def lncli(cmd, node_index):
+    """Run lncli commands for a node"""
     node = Node.from_index(node_index)
     os.system(f'lncli --tlscertpath={node.cert()} --rpcserver=localhost:{node.rpc_port} --macaroonpath={node.macaroon()} {cmd}')
 
 @click.command()
 @click.option('--node', '-n', 'node_index', default=0)
 def lndconnect(node_index):
+    """Display the lndconnect url for a node"""
     lndconnect_node(Node.from_index(node_index))
 
 @click.command()
 @click.argument('node_index', type=int)
 def set_mining_node(node_index):
+    """Set the node receiving mined blocks"""
     set_mining_node_index(node_index)
 
 @click.command()
 @click.argument('count', default=1)
 def gen_block(count):
+    """Generate COUNT blocks to the current mining-node"""
     os.system(f'btcctl --simnet --rpcuser=kek --rpcpass=kek generate {count} &> /dev/null')
 
 @click.command()
-@click.option('--node', '-n', 'node_index', default=0)
+@click.argument('node_index', default=0)
 def peer(node_index):
+    """Show the address (identity_pubkey@host) of a node."""
     node = Node.from_index(node_index)
     pub_key = post(node, 'getinfo')['identity_pubkey']
     address = f'{pub_key}@localhost:{node.port}'
@@ -164,7 +171,7 @@ def peer(node_index):
 
 @click.group()
 def cli():
-    pass
+    """Simplify lnd simnets."""
 
 cli.add_command(start)
 cli.add_command(stop)

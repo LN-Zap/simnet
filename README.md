@@ -11,19 +11,21 @@ pip3 install https://github.com/LN-Zap/simnet/archive/master.zip
 ## Help
 
 ```
-Usage: simnet [OPTIONS] COMMAND [ARGS]...
+Usage: simnet.py [OPTIONS] COMMAND [ARGS]...
+
+Simplify lnd simnets.
 
 Options:
 --help  Show this message and exit.
 
 Commands:
-gen-block
-lncli
-lndconnect
-peer
-set-mining-node
-start
-stop
+gen-block        Generate COUNT blocks to the current mining-node
+lncli            Run lncli commands for a node
+lndconnect       Display the lndconnect url for a node
+peer             Show the address (identity_pubkey@host) of a node.
+set-mining-node  Set the node receiving mined blocks
+start            Start and initialize COUNT nodes
+stop             Stop btcd, lnd and remove all node data
 ```
 
 ## Setup bash completion
