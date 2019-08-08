@@ -24,9 +24,9 @@ Options:
 --help  Show this message and exit.
 
 Commands:
+block       Generate COUNT blocks
 clean       Stop btcd, lnd and remove all node data
 fund        Send AMOUNT satoshis from node_1 to NODE_INDEX
-gen-block   Generate COUNT blocks to the current mining-node
 init        Start and initialize COUNT nodes
 lncli       Run lncli commands for a node
 lndconnect  Display the lndconnect url for a node

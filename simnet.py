@@ -128,7 +128,7 @@ def _set_mining_node(index):
 def run_lncli(node, cmd):
     os.system(f'lncli --tlscertpath={node.cert()} --rpcserver=localhost:{node.rpc_port} --macaroonpath={node.macaroon()} {cmd}')
 
-def _gen_block(count):
+def _block(count):
     os.system(f'btcctl --simnet --rpcuser=kek --rpcpass=kek generate {count} &> /dev/null')
     click.echo(f'mined {count} blocks')
 
@@ -153,7 +153,7 @@ def init(count):
     _set_mining_node(1)
     time.sleep(3)
 
-    _gen_block(150)
+    _block(150)
 
 @click.command()
 def clean():
@@ -187,9 +187,9 @@ def lndconnect(node_index):
 
 @click.command()
 @click.argument('count', default=1)
-def gen_block(count):
-    """Generate COUNT blocks to the current mining-node"""
-    _gen_block(count)
+def block(count):
+    """Generate COUNT blocks"""
+    _block(count)
 
 @click.command()
 @click.argument('node_index', default=0)
@@ -242,7 +242,7 @@ def cli():
 cli.add_command(init)
 cli.add_command(clean)
 cli.add_command(lndconnect)
-cli.add_command(gen_block)
+cli.add_command(block)
 cli.add_command(lncli)
 cli.add_command(peer)
 cli.add_command(start)
