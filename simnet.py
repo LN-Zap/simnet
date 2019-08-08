@@ -111,23 +111,33 @@ def address(node):
     json = get(node, 'newaddress')
     return json['address']
 
-def set_mining_node_index(index):
+def start_btcd(mining_address=None):
+    btcd = 'btcd --txindex --simnet --rpcuser=kek --rpcpass=kek'
+    if mining_address:
+        btcd += f' --miningaddr={mining_address}'
+    btcd += ' > /dev/null &'
+    os.system(btcd)
+
+def _set_mining_node(index):
     dest = address(Node.from_index(index))
 
-    os.system('killall btcd')
+    os.system('killall -9 btcd')
     time.sleep(2)
-    os.system(f'btcd --simnet --txindex --rpcuser=kek --rpcpass=kek --miningaddr={dest} > /dev/null &')
+    start_btcd(dest)
 
 def run_lncli(node, cmd):
     os.system(f'lncli --tlscertpath={node.cert()} --rpcserver=localhost:{node.rpc_port} --macaroonpath={node.macaroon()} {cmd}')
+
+def _gen_block(count):
+    os.system(f'btcctl --simnet --rpcuser=kek --rpcpass=kek generate {count} &> /dev/null')
+    click.echo(f'mined {count} blocks')
 
 @click.command()
 @click.option('--count', '-c',  default=2)
 def init(count):
     """Start and initialize COUNT nodes"""
     click.echo('starting btcd')
-    btcd = 'btcd --txindex --simnet --rpcuser=kek --rpcpass=kek > /dev/null &'
-    os.system(btcd)
+    start_btcd()
     
     for index in range(0, count):
         node = Node.from_index(index)
@@ -137,14 +147,19 @@ def init(count):
         init_lnd(node)
 
     time.sleep(2)
-    set_mining_node_index(0)
     lndconnect_node(Node.from_index(0))
+
+    time.sleep(5)
+    _set_mining_node(1)
+    time.sleep(3)
+
+    _gen_block(150)
 
 @click.command()
 def clean():
     """Stop btcd, lnd and remove all node data"""
-    os.system('killall lnd')
-    os.system('killall btcd')
+    os.system('killall -9 lnd')
+    os.system('killall -9 btcd')
     
     index = 0
     while True:
@@ -171,16 +186,10 @@ def lndconnect(node_index):
     lndconnect_node(Node.from_index(node_index))
 
 @click.command()
-@click.argument('node_index', type=int)
-def set_mining_node(node_index):
-    """Set the node receiving mined blocks"""
-    set_mining_node_index(node_index)
-
-@click.command()
 @click.argument('count', default=1)
 def gen_block(count):
     """Generate COUNT blocks to the current mining-node"""
-    os.system(f'btcctl --simnet --rpcuser=kek --rpcpass=kek generate {count} &> /dev/null')
+    _gen_block(count)
 
 @click.command()
 @click.argument('node_index', default=0)
@@ -210,6 +219,22 @@ def stop(node_index):
     node = Node.from_index(node_index)
     run_lncli(node, 'stop')
 
+def _fund(node_index, amount):
+    node = Node.from_index(node_index)
+    sending_node = Node.from_index(1)
+    destination_address = address(node)
+    run_lncli(sending_node, f'sendcoins {destination_address} {amount}')
+
+@click.command()
+@click.argument('node_index', type=int)
+@click.option('--amount', '-a',  default=100000000)
+def fund(node_index, amount):
+    """Send AMOUNT satoshis from node_1 to NODE_INDEX"""
+    node = Node.from_index(node_index)
+    sending_node = Node.from_index(1)
+    destination_address = address(node)
+    run_lncli(sending_node, f'sendcoins {destination_address} {amount}')
+
 @click.group()
 def cli():
     """Simplify lnd simnets."""
@@ -220,9 +245,9 @@ cli.add_command(lndconnect)
 cli.add_command(gen_block)
 cli.add_command(lncli)
 cli.add_command(peer)
-cli.add_command(set_mining_node)
 cli.add_command(start)
 cli.add_command(stop)
+cli.add_command(fund)
 
 if __name__ == '__main__':
     cli()
