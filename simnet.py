@@ -10,20 +10,24 @@ import requests
 import shutil
 import time
 
+from pathlib import Path
 from twisted.internet import ssl
 
 class Node:
-    def __init__(self, path, rpc_port, rest_port, port):
-        self.path = path
+    def __init__(self, name, rpc_port, rest_port, port):
+        self.name = name
         self.rpc_port = rpc_port
         self.rest_port = rest_port
         self.port = port
 
     def macaroon(self):
-        return f'{self.path}/data/chain/bitcoin/simnet/admin.macaroon'
+        return f'{self.path()}/data/chain/bitcoin/simnet/admin.macaroon'
 
     def cert(self):
-        return f'{self.path}/tls.cert'
+        return f'{self.path()}/tls.cert'
+
+    def path(self):
+        return f'{Path.home()}/.simnet/{self.name}'
 
     @classmethod
     def from_index(cls, node_index):
@@ -33,8 +37,8 @@ def start_lnd(node):
     lnd = f'''
     lnd \
     --maxpendingchannels=100 \
-    --alias={node.path} \
-    --lnddir={node.path} \
+    --alias={node.name} \
+    --lnddir={node.path()} \
     --rpclisten=localhost:{node.rpc_port} \
     --listen=localhost:{node.port} \
     --restlisten=localhost:{node.rest_port} \
@@ -48,6 +52,7 @@ def start_lnd(node):
     > /dev/null &
     '''
     os.system(lnd) 
+    click.echo(f'[{node.name}] started lnd ({node.path()})')
 
 def lndconnect_node(node):
     chain = pem.parse_file(node.cert())
@@ -75,7 +80,7 @@ def init_lnd(node):
         verify=node.cert(), 
         data=json.dumps(data)
     )
-    click.echo(f'[{node.path}] wallet created')
+    click.echo(f'[{node.name}] wallet created')
 
 def post(node, url, data={}):
     with open(node.macaroon(), 'rb') as macaroon_file:
@@ -141,7 +146,6 @@ def init(count):
     
     for index in range(0, count):
         node = Node.from_index(index)
-        click.echo(f'[{node.path}] started')
         start_lnd(node)
         time.sleep(2)
         init_lnd(node)
@@ -165,7 +169,7 @@ def clean():
     while True:
         node = Node.from_index(index)
         try:
-            shutil.rmtree(node.path)
+            shutil.rmtree(node.path())
         except:
             click.echo(f'removed {index} nodes.')
             break
