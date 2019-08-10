@@ -29,9 +29,32 @@ class Node:
     def path(self):
         return f'{Path.home()}/.simnet/{self.name}'
 
+    def log(self):
+        return f'{Path.home()}/.simnet/{self.name}.log'
+
     @classmethod
     def from_index(cls, node_index):
         return Node(f'node_{node_index}', 10000 + node_index, 8000 + node_index, 11000 + node_index)
+
+# Read from a log file as it's being written using python
+# https://stackoverflow.com/questions/3290292/read-from-a-log-file-as-its-being-written-using-python
+def follow(thefile):
+    while True:
+        line = thefile.readline()
+        if not line:
+            time.sleep(0.1) # Sleep briefly
+            continue
+        yield line
+
+def wait_for_log(node, string):
+    with open(node.log(), 'r') as log_file:
+        for line in follow(log_file):
+            if string in line:
+                return
+
+def wait_for_file(file_path):
+    while not os.path.exists(file_path):
+        time.sleep(0.1)
 
 def start_lnd(node):
     lnd = f'''
@@ -42,16 +65,20 @@ def start_lnd(node):
     --rpclisten=localhost:{node.rpc_port} \
     --listen=localhost:{node.port} \
     --restlisten=localhost:{node.rest_port} \
-    --debuglevel=info \
+    --debuglevel=debug \
     --bitcoin.simnet \
     --bitcoin.active \
     --bitcoin.node=btcd \
     --btcd.rpcuser=kek \
     --btcd.rpcpass=kek \
     --configfile=lnd.conf \
-    > /dev/null &
+    &> {node.log()} &
     '''
     os.system(lnd) 
+
+    wait_for_file(node.log())
+    wait_for_log(node, 'Waiting for wallet encryption password.')
+
     click.echo(f'[{node.name}] started lnd ({node.path()})')
 
 def lndconnect_node(node):
@@ -147,17 +174,18 @@ def init(count):
     for index in range(0, count):
         node = Node.from_index(index)
         start_lnd(node)
-        time.sleep(2)
+        wait_for_file(node.cert())
         init_lnd(node)
 
-    time.sleep(2)
-    lndconnect_node(Node.from_index(0))
+    mining_node = Node.from_index(0)
+    wait_for_file(mining_node.macaroon())
+    lndconnect_node(mining_node)
 
-    time.sleep(5)
-    _set_mining_node(1)
-    time.sleep(3)
-
-    _block(150)
+    if count > 1:
+        time.sleep(5)
+        _set_mining_node(1)
+        time.sleep(3)
+        _block(150)
 
 @click.command()
 def clean():
