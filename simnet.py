@@ -13,6 +13,9 @@ import time
 from pathlib import Path
 from twisted.internet import ssl
 
+root = f'{Path.home()}/.simnet/'
+btcd_log = f'{root}btcd.log'
+
 class Node:
     def __init__(self, name, rpc_port, rest_port, port):
         self.name = name
@@ -27,10 +30,10 @@ class Node:
         return f'{self.path()}/tls.cert'
 
     def path(self):
-        return f'{Path.home()}/.simnet/{self.name}'
+        return f'{root}{self.name}'
 
     def log(self):
-        return f'{Path.home()}/.simnet/{self.name}.log'
+        return f'{root}{self.name}.log'
 
     @classmethod
     def from_index(cls, node_index):
@@ -42,12 +45,12 @@ def follow(thefile):
     while True:
         line = thefile.readline()
         if not line:
-            time.sleep(0.1) # Sleep briefly
+            time.sleep(0.1)
             continue
         yield line
 
-def wait_for_log(node, string):
-    with open(node.log(), 'r') as log_file:
+def wait_for_log(path, string):
+    with open(path, 'r') as log_file:
         for line in follow(log_file):
             if string in line:
                 return
@@ -77,7 +80,7 @@ def start_lnd(node):
     os.system(lnd) 
 
     wait_for_file(node.log())
-    wait_for_log(node, 'Waiting for wallet encryption password.')
+    wait_for_log(node.log(), 'Waiting for wallet encryption password.')
 
     click.echo(f'[{node.name}] started lnd ({node.path()})')
 
@@ -140,18 +143,27 @@ def get(node, url, data={}):
     return r.json()
 
 def address(node):
-    json = get(node, 'newaddress')
-    return json['address']
+    max_tries = 20
+    while True:
+        try:
+            json = get(node, 'newaddress')
+            return json['address']
+        except Exception as e:
+            if max_tries == 0:
+                raise e
+
+            time.sleep(0.3)
+            max_tries -= 1
 
 def start_btcd(mining_address=None):
     btcd = 'btcd --txindex --simnet --rpcuser=kek --rpcpass=kek'
     if mining_address:
         btcd += f' --miningaddr={mining_address}'
-    btcd += ' > /dev/null &'
+    btcd += f' &> {btcd_log} &'
     os.system(btcd)
 
-def _set_mining_node(index):
-    dest = address(Node.from_index(index))
+def _set_mining_node(node):
+    dest = address(node)
 
     os.system('killall -9 btcd')
     time.sleep(2)
@@ -161,7 +173,7 @@ def run_lncli(node, cmd):
     os.system(f'lncli --tlscertpath={node.cert()} --rpcserver=localhost:{node.rpc_port} --macaroonpath={node.macaroon()} {cmd}')
 
 def _block(count):
-    os.system(f'btcctl --simnet --rpcuser=kek --rpcpass=kek generate {count} &> /dev/null')
+    os.system(f'btcctl --simnet --rpcuser=kek --rpcpass=kek generate {count} 2> /dev/null | jq .[] | wc -l')
     click.echo(f'mined {count} blocks')
 
 @click.command()
@@ -177,14 +189,15 @@ def init(count):
         wait_for_file(node.cert())
         init_lnd(node)
 
-    mining_node = Node.from_index(0)
-    wait_for_file(mining_node.macaroon())
-    lndconnect_node(mining_node)
-
+    first_node = Node.from_index(0)
+    wait_for_file(first_node.macaroon())
+    lndconnect_node(first_node)
+    
     if count > 1:
-        time.sleep(5)
-        _set_mining_node(1)
-        time.sleep(3)
+        mining_node = Node.from_index(1)
+        wait_for_file(mining_node.macaroon())
+        _set_mining_node(mining_node)
+        time.sleep(4)
         _block(150)
 
 @click.command()
