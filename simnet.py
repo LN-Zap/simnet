@@ -15,6 +15,7 @@ from twisted.internet import ssl
 
 root = f'{Path.home()}/.simnet/'
 btcd_log = f'{root}btcd.log'
+btcd_dir = f'{root}btcd'
 
 class Node:
     def __init__(self, name, rpc_port, rest_port, port):
@@ -156,7 +157,7 @@ def address(node):
             max_tries -= 1
 
 def start_btcd(mining_address=None):
-    btcd = 'btcd --txindex --simnet --rpcuser=kek --rpcpass=kek'
+    btcd = f'btcd --txindex --simnet --rpcuser=kek --rpcpass=kek --datadir={btcd_dir}'
     if mining_address:
         btcd += f' --miningaddr={mining_address}'
     btcd += f' &> {btcd_log} &'
@@ -206,11 +207,15 @@ def clean():
     os.system('killall -9 lnd')
     os.system('killall -9 btcd')
     
+    shutil.rmtree(btcd_dir)
+    os.remove(btcd_log)
+
     index = 0
     while True:
         node = Node.from_index(index)
         try:
             shutil.rmtree(node.path())
+            os.remove(node.log())
         except:
             click.echo(f'removed {index} nodes.')
             break
