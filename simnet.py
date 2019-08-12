@@ -285,6 +285,15 @@ def fund(node_index, amount):
     destination_address = address(node)
     run_lncli(sending_node, f'sendcoins {destination_address} {amount}')
 
+@click.command()
+@click.argument('node_index', type=int)
+def macaroon(node_index):
+    """Display the node's macaroon in hex"""
+    node = Node.from_index(node_index)
+    with open(node.macaroon(), 'rb') as f:
+        content = f.read()
+    click.echo(binascii.hexlify(content))
+
 @click.group()
 def cli():
     """Simplify lnd simnets."""
@@ -298,6 +307,7 @@ cli.add_command(peer)
 cli.add_command(start)
 cli.add_command(stop)
 cli.add_command(fund)
+cli.add_command(macaroon)
 
 if __name__ == '__main__':
     cli()

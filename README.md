@@ -16,7 +16,7 @@ sudo -H pip3 install .
 ## Help
 
 ```
-Usage: simnet.py [OPTIONS] COMMAND [ARGS]...
+Usage: simnet [OPTIONS] COMMAND [ARGS]...
 
 Simplify lnd simnets.
 
@@ -30,6 +30,7 @@ fund        Send AMOUNT satoshis from node_1 to NODE_INDEX
 init        Start and initialize COUNT nodes
 lncli       Run lncli commands for a node
 lndconnect  Display the lndconnect url for a node
+macaroon    Display the node's macaroon in hex
 peer        Show the address (identity_pubkey@host) of a node.
 start       Start a specific node
 stop        Stop a specific node
