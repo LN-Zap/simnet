@@ -199,7 +199,9 @@ def init(count):
         wait_for_file(mining_node.macaroon())
         _set_mining_node(mining_node)
         time.sleep(4)
-        _block(150)
+        # We need at least 100 blocks because coinbase funds can’t be spent until after 100 
+        # confirmations, and we need about 300 to activate segwit.
+        _block(400)
 
 @click.command()
 def clean():
