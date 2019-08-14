@@ -60,25 +60,37 @@ def wait_for_file(file_path):
     while not os.path.exists(file_path):
         time.sleep(0.1)
 
-def start_lnd(node):
-    lnd = f'''
-    lnd \
-    --maxpendingchannels=100 \
-    --alias={node.name} \
-    --lnddir={node.path()} \
-    --rpclisten=localhost:{node.rpc_port} \
-    --listen=localhost:{node.port} \
-    --restlisten=localhost:{node.rest_port} \
-    --debuglevel=debug \
-    --bitcoin.simnet \
-    --bitcoin.active \
-    --bitcoin.node=btcd \
-    --btcd.rpcuser=kek \
-    --btcd.rpcpass=kek \
-    --configfile=lnd.conf \
-    &> {node.log()} &
-    '''
-    os.system(lnd) 
+def start_lnd(node, neutrino):
+    lnd = [
+        'lnd',
+        '--maxpendingchannels=100',
+        f'--alias={node.name}',
+        f'--lnddir={node.path()}',
+        f'--rpclisten=localhost:{node.rpc_port}',
+        f'--listen=localhost:{node.port}',
+        f'--restlisten=localhost:{node.rest_port}',
+        '--debuglevel=debug',
+        '--bitcoin.simnet',
+        '--bitcoin.active',
+        '--configfile=lnd.conf'
+    ]
+    
+    if neutrino:
+        lnd += [
+            '--bitcoin.node=neutrino',
+            '--neutrino.connect=localhost'
+        ]
+    else:
+        lnd += [
+            '--bitcoin.node=btcd'
+            '--btcd.rpcuser=kek'
+            '--btcd.rpcpass=kek'
+        ]
+
+    lnd += [f'&> {node.log()} &']
+
+    command = ' '.join(lnd)
+    os.system(command) 
 
     wait_for_file(node.log())
     wait_for_log(node.log(), 'Waiting for wallet encryption password.')
@@ -179,14 +191,15 @@ def _block(count):
 
 @click.command()
 @click.option('--count', '-c',  default=2)
-def init(count):
+@click.option('--neutrino', is_flag=True)
+def init(count, neutrino):
     """Start and initialize COUNT nodes"""
     click.echo('starting btcd')
     start_btcd()
     
     for index in range(0, count):
         node = Node.from_index(index)
-        start_lnd(node)
+        start_lnd(node, neutrino)
         wait_for_file(node.cert())
         init_lnd(node)
 
@@ -254,10 +267,11 @@ def peer(node_index):
 
 @click.command()
 @click.argument('node_index', type=int)
-def start(node_index):
+@click.option('--neutrino', is_flag=True)
+def start(node_index, neutrino):
     """Start a specific node"""
     node = Node.from_index(node_index)
-    start_lnd(node)
+    start_lnd(node, neutrino)
     time.sleep(2)
     data = {
         'wallet_password': base64.b64encode(b'12341234').decode()
