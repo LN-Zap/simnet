@@ -310,6 +310,19 @@ def macaroon(node_index):
         content = f.read()
     click.echo(binascii.hexlify(content))
 
+@click.command()
+def list():
+    """Display a list of active nodes"""
+    index = 0
+    while True:
+        node = Node.from_index(index)
+        if os.path.exists(node.path()):
+            click.echo(f'{index}: node_{index}')
+            click.echo(run_lncli(node, 'getinfo | jq .identity_pubkey'))
+        else:
+            break
+        index += 1
+
 @click.group()
 def cli():
     """Simplify lnd simnets."""
@@ -324,6 +337,7 @@ cli.add_command(start)
 cli.add_command(stop)
 cli.add_command(fund)
 cli.add_command(macaroon)
+cli.add_command(list)
 
 if __name__ == '__main__':
     cli()
