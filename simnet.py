@@ -82,8 +82,8 @@ def start_lnd(node, neutrino):
         ]
     else:
         lnd += [
-            '--bitcoin.node=btcd'
-            '--btcd.rpcuser=kek'
+            '--bitcoin.node=btcd',
+            '--btcd.rpcuser=kek',
             '--btcd.rpcpass=kek'
         ]
 
