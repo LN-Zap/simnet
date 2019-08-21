@@ -194,6 +194,10 @@ def _block(count):
 @click.option('--neutrino', is_flag=True)
 def init(count, neutrino):
     """Start and initialize COUNT nodes"""
+
+    if not os.path.exists(root):
+        os.makedirs(root)
+
     click.echo('starting btcd')
     start_btcd()
     
