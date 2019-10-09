@@ -13,6 +13,8 @@ Or clone and run:
 sudo -H pip3 install .
 ```
 
+You also need to install **jq** (`brew install jq` on a mac).
+
 ## Help
 
 ```
