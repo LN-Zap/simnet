@@ -100,7 +100,7 @@ def start_lnd(node, neutrino):
 def lndconnect_node(node):
     chain = pem.parse_file(node.cert())
     chainCert = ssl.Certificate.loadPEM(str(chain[0]))
-    cert = base64.b64encode(chainCert.dump())
+    cert = base64.urlsafe_b64encode(chainCert.dump())
 
     with open(node.macaroon(), 'rb') as macaroon_file:
         macaroon = base64.urlsafe_b64encode(macaroon_file.read())
