@@ -60,7 +60,7 @@ def wait_for_file(file_path):
     while not os.path.exists(file_path):
         time.sleep(0.1)
 
-def start_lnd(node, neutrino):
+def start_lnd(node, neutrino, uri):
     lnd = [
         'lnd',
         '--maxpendingchannels=100',
@@ -74,7 +74,10 @@ def start_lnd(node, neutrino):
         '--bitcoin.active',
         '--configfile=lnd.conf'
     ]
-    
+
+    if uri:
+        lnd += ['--externalip=127.0.0.1']
+
     if neutrino:
         lnd += [
             '--bitcoin.node=neutrino',
@@ -190,9 +193,10 @@ def _block(count):
     click.echo(f'mined {count} blocks')
 
 @click.command()
-@click.option('--count', '-c',  default=2)
-@click.option('--neutrino', is_flag=True)
-def init(count, neutrino):
+@click.option('--count', '-c',  default=2, help="the number of nodes that should be started")
+@click.option('--neutrino', is_flag=True, help="should the nodes use neutrino or btcd backends")
+@click.option('--uri', is_flag=True, help="if set getInfo response's uris array is not empty")
+def init(count, neutrino, uri):
     """Start and initialize COUNT nodes"""
 
     if not os.path.exists(root):
@@ -203,7 +207,7 @@ def init(count, neutrino):
     
     for index in range(0, count):
         node = Node.from_index(index)
-        start_lnd(node, neutrino)
+        start_lnd(node, neutrino, uri)
         wait_for_file(node.cert())
         init_lnd(node)
 
